@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/1password/onepassword-sdk-go"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/headzoo/surf"
 	"github.com/headzoo/surf/agent"
 	"github.com/headzoo/surf/browser"
@@ -88,10 +92,10 @@ func (t *Timebutler) login() {
 
 }
 
-func (t *Timebutler) addTimeEntry(timeEntry string) {
-	err := t.browser.Open("https://timebutler.de/do?ha=zee&ac=1")
+func (t *Timebutler) enterWorkingTime(date, timeEntry string) {
+	err := t.browser.Open(fmt.Sprintf("https://timebutler.de/do?ha=zee&ac=1&setstart=%s-0", date))
 	if err != nil {
-		fmt.Println("Opening New time entry page failed")
+		fmt.Println("Opening Enter working time page failed")
 		panic(err)
 	}
 	// Submit new Entry
@@ -106,8 +110,63 @@ func (t *Timebutler) addTimeEntry(timeEntry string) {
 	}
 }
 
+func (t *Timebutler) getMissingEntries() map[string]string {
+	if err := t.browser.Open("https://timebutler.de/do?ha=zee&ac=41"); err != nil {
+		fmt.Println("Opening Calendar view failed")
+		panic(err)
+	}
+	var missing map[string]string = make(map[string]string)
+
+	t.browser.Find("td.day").Each(func(i int, s *goquery.Selection) {
+		missingHours := s.Find("span.ov").Text()
+		classStr, exists := s.Attr("class")
+		if exists == false {
+			fmt.Println("Class attribute is missing for a day")
+			return
+		}
+		if strings.HasPrefix(missingHours, "-") &&
+			!strings.Contains(classStr, " dea ") {
+			for _, class := range strings.Split(classStr, " ") {
+				if strings.HasPrefix(class, "sch-") {
+					missing[strings.TrimPrefix(class, "sch-")] = missingHours
+					return
+				}
+			}
+		}
+	})
+
+	return missing
+}
+
+func getDateFromDOY(doy string) string {
+	parts := strings.Split(doy, "-")
+
+	year, err := strconv.Atoi(parts[0])
+	if err != nil {
+		fmt.Println("Failed to cast date class string")
+		panic(err)
+	}
+
+	nthDay, err := strconv.Atoi(parts[1])
+	if err != nil {
+		fmt.Println("Failed to cast date class string")
+		panic(err)
+
+	}
+	// Start from the first day of the year
+	startOfYear := time.Date(year, time.January, 1, 0, 0, 0, 0, time.UTC)
+
+	// Add (nthDay - 1) days to the start of the year
+	targetDate := startOfYear.AddDate(0, 0, nthDay-1)
+
+	return targetDate.Format("2006-1-2")
+}
+
+func tidyMissingHour(missingHour string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(missingHour, " ", ""), "-", "")
+}
+
 func main() {
-	timeEntry := "8h"
 	token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
 
 	// Gets your service account token from the OP_SERVICE_ACCOUNT_TOKEN environment variable.
@@ -120,7 +179,18 @@ func main() {
 	timeButler := getNewTimebutler(timebutlerUsername, timebutlerPassword, bow)
 	timeButler.login()
 
-	// Navigate to the Enter time entry page
-	timeButler.addTimeEntry(timeEntry)
-	fmt.Printf("%s time entry has been recorded to Timebutler\n", timeEntry)
+	// Fetch the missing entries from the Calendar view
+	missing := timeButler.getMissingEntries()
+
+	if len(missing) == 0 {
+		fmt.Println("There is nothing to be added to Timebutler!")
+	} else {
+		for dayOfYear, missingHour := range missing {
+			dateStr := getDateFromDOY(dayOfYear)
+			missingHourStr := tidyMissingHour(missingHour)
+			fmt.Printf("Adding %s to %s\n", missingHourStr, dateStr)
+			// Add the missing time entries per day
+			timeButler.enterWorkingTime(dateStr, missingHourStr)
+		}
+	}
 }
