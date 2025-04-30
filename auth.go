@@ -7,7 +7,9 @@ import (
 	"github.com/1password/onepassword-sdk-go"
 )
 
-func getTimebutlerCreds(token string) (string, string) {
+func getTimebutlerCreds1Password(
+	token, vaultID, itemID, usernameField, passwordField string,
+) (string, string) {
 	// Authenticates with your service account token and connects to 1Password.
 	client, err := onepassword.NewClient(context.Background(),
 		onepassword.WithServiceAccountToken(token),
@@ -18,10 +20,6 @@ func getTimebutlerCreds(token string) (string, string) {
 	}
 	// Retrieves a secret from 1Password.
 	// Takes a secret reference as input and returns the secret to which it points.
-	vaultID := "ONEKEY"
-	itemID := "Timebutler"
-	usernameField := "username"
-	passwordField := "password"
 	username, err := client.Secrets().
 		Resolve(context.Background(), fmt.Sprintf("op://%s/%s/%s", vaultID, itemID, usernameField))
 	if err != nil {
