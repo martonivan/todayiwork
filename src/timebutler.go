@@ -23,7 +23,7 @@ func GetNewTimebutler(username, password string, bow *browser.Browser) Timebutle
 }
 
 func (t *Timebutler) Login() {
-	err := t.browser.Open("https://timebutler.de/login/")
+	err := t.browser.Open("https://app.timebutler.com/login/")
 	if err != nil {
 		fmt.Println("Opening Login page failed")
 		panic(err)
@@ -44,7 +44,9 @@ func (t *Timebutler) Login() {
 }
 
 func (t *Timebutler) EnterWorkingTime(date, timeEntry string) {
-	err := t.browser.Open(fmt.Sprintf("https://timebutler.de/do?ha=zee&ac=1&setstart=%s-0", date))
+	err := t.browser.Open(
+		fmt.Sprintf("https://app.timebutler.com/do?ha=zee&ac=1&setstart=%s-0", date),
+	)
 	if err != nil {
 		fmt.Println("Opening Enter working time page failed")
 		panic(err)
@@ -62,7 +64,7 @@ func (t *Timebutler) EnterWorkingTime(date, timeEntry string) {
 }
 
 func (t *Timebutler) GetMissingEntries() map[string]string {
-	if err := t.browser.Open("https://timebutler.de/do?ha=zee&ac=41"); err != nil {
+	if err := t.browser.Open("https://app.timebutler.com/do?ha=zee&ac=41"); err != nil {
 		fmt.Println("Opening Calendar view failed")
 		panic(err)
 	}
